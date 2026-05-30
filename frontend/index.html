@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Medical Imaging AI — Chest X-Ray Pathology Detection</title>
+  <style>
+    /* ------------------------------------------------------------------ */
+    /* Design tokens — dark luxury clinical theme                          */
+    /* ------------------------------------------------------------------ */
+    :root {
+      --color-bg:         #080d14;
+      --color-surface:    #0e1723;
+      --color-surface-2:  #162032;
+      --color-border:     #1e3050;
+      --color-text:       #c8d8ea;
+      --color-text-muted: #5a7a9a;
+      --color-accent:     #2d8cf0;
+      --color-accent-2:   #00d4aa;
+      --color-danger:     #ff6b7a;
+      --color-warning:    #f6ad55;
+      --color-success:    #48bb78;
+
+      --radius-sm:  6px;
+      --radius-md:  12px;
+      --radius-lg:  20px;
+
+      --space-xs:  0.4rem;
+      --space-sm:  0.8rem;
+      --space-md:  1.4rem;
+      --space-lg:  2.5rem;
+      --space-xl:  4rem;
+
+      --text-xs:   0.75rem;
+      --text-sm:   0.875rem;
+      --text-base: 1rem;
+      --text-lg:   1.2rem;
+      --text-xl:   1.5rem;
+      --text-2xl:  2rem;
+      --text-hero: clamp(2rem, 2vw + 1.4rem, 3.2rem);
+
+      --duration-fast:   150ms;
+      --duration-normal: 300ms;
+      --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+      --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+      --font-mono: "JetBrains Mono", "Fira Code", monospace;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Reset & base                                                        */
+    /* ------------------------------------------------------------------ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg);
+      color: var(--color-text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    a { color: var(--color-accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    img { max-width: 100%; height: auto; display: block; }
+
+    /* ------------------------------------------------------------------ */
+    /* Nav                                                                 */
+    /* ------------------------------------------------------------------ */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(8, 13, 20, 0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--color-border);
+      padding: 0 var(--space-lg);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 60px;
+    }
+    .nav-logo {
+      font-size: var(--text-lg);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+    .nav-logo span { color: var(--color-accent); }
+    .nav-links {
+      display: flex;
+      gap: var(--space-md);
+      list-style: none;
+      font-size: var(--text-sm);
+    }
+    .nav-links a { color: var(--color-text-muted); transition: color var(--duration-fast); }
+    .nav-links a:hover { color: var(--color-text); text-decoration: none; }
+
+    /* ------------------------------------------------------------------ */
+    /* Hero                                                                */
+    /* ------------------------------------------------------------------ */
+    .hero {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: var(--space-xl) var(--space-lg);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-xl);
+      align-items: center;
+    }
+    @media (max-width: 768px) {
+      .hero { grid-template-columns: 1fr; }
+    }
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+      background: rgba(45, 140, 240, 0.1);
+      border: 1px solid rgba(45, 140, 240, 0.3);
+      border-radius: 100px;
+      padding: 4px 14px;
+      font-size: var(--text-xs);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-accent);
+      margin-bottom: var(--space-sm);
+    }
+    .hero h1 {
+      font-size: var(--text-hero);
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1.15;
+      color: #fff;
+      margin-bottom: var(--space-md);
+    }
+    .hero h1 em {
+      font-style: normal;
+      background: linear-gradient(135deg, var(--color-accent), var(--color-accent-2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub {
+      font-size: var(--text-base);
+      color: var(--color-text-muted);
+      max-width: 480px;
+      margin-bottom: var(--space-lg);
+    }
+    .hero-actions {
+      display: flex;
+      gap: var(--space-sm);
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 22px;
+      border-radius: var(--radius-md);
+      font-size: var(--text-sm);
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity var(--duration-fast), transform var(--duration-fast);
+    }
+    .btn:hover { opacity: 0.88; transform: translateY(-1px); text-decoration: none; }
+    .btn-primary {
+      background: var(--color-accent);
+      color: #fff;
+    }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--color-border);
+      color: var(--color-text);
+    }
+
+    /* Hero visual — animated scan lines */
+    .hero-visual {
+      position: relative;
+      aspect-ratio: 1;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .hero-visual::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(45,140,240,0.04) 3px,
+        rgba(45,140,240,0.04) 4px
+      );
+      pointer-events: none;
+    }
+    .scan-label {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      font-size: var(--text-xs);
+      font-family: var(--font-mono);
+      color: var(--color-accent);
+      letter-spacing: 0.1em;
+    }
+    .scan-label::before { content: "● "; animation: blink 1.4s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+    .xray-placeholder {
+      width: 70%;
+      aspect-ratio: 1;
+      border-radius: var(--radius-md);
+      background: radial-gradient(ellipse at 38% 52%, rgba(200,200,200,0.18) 30%, transparent 70%),
+                  radial-gradient(ellipse at 62% 52%, rgba(200,200,200,0.22) 34%, transparent 72%),
+                  radial-gradient(ellipse at 50% 56%, rgba(255,255,255,0.35) 12%, transparent 36%),
+                  #111820;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Stat strip                                                          */
+    /* ------------------------------------------------------------------ */
+    .stats-strip {
+      border-top: 1px solid var(--color-border);
+      border-bottom: 1px solid var(--color-border);
+      padding: var(--space-md) var(--space-lg);
+      display: flex;
+      justify-content: center;
+      gap: var(--space-xl);
+      flex-wrap: wrap;
+    }
+    .stat-item { text-align: center; }
+    .stat-value {
+      font-size: var(--text-xl);
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.03em;
+    }
+    .stat-label {
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Section wrapper                                                     */
+    /* ------------------------------------------------------------------ */
+    section {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: var(--space-xl) var(--space-lg);
+    }
+    .section-heading {
+      font-size: var(--text-xl);
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: var(--space-xs);
+    }
+    .section-sub {
+      font-size: var(--text-sm);
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-lg);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Classes grid                                                        */
+    /* ------------------------------------------------------------------ */
+    .classes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: var(--space-md);
+    }
+    .class-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-md);
+      transition: border-color var(--duration-normal), transform var(--duration-normal);
+    }
+    .class-card:hover {
+      border-color: var(--color-accent);
+      transform: translateY(-3px);
+    }
+    .class-icon { font-size: 2rem; margin-bottom: var(--space-xs); }
+    .class-name { font-weight: 700; color: #fff; font-size: var(--text-base); }
+    .class-desc { font-size: var(--text-sm); color: var(--color-text-muted); margin-top: 4px; }
+    .class-auc {
+      display: inline-block;
+      margin-top: var(--space-xs);
+      background: rgba(0,212,170,0.1);
+      border: 1px solid rgba(0,212,170,0.3);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: var(--text-xs);
+      color: var(--color-accent-2);
+      font-family: var(--font-mono);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Architecture diagram                                                */
+    /* ------------------------------------------------------------------ */
+    .arch-flow {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      flex-wrap: wrap;
+      margin-bottom: var(--space-lg);
+    }
+    .arch-block {
+      background: var(--color-surface-2);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: var(--space-xs) var(--space-sm);
+      font-size: var(--text-sm);
+      font-family: var(--font-mono);
+      color: var(--color-text);
+    }
+    .arch-block.highlight {
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+    }
+    .arch-arrow { color: var(--color-text-muted); font-size: var(--text-lg); }
+
+    /* ------------------------------------------------------------------ */
+    /* Gradcam section                                                     */
+    /* ------------------------------------------------------------------ */
+    .gradcam-steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--space-md);
+      counter-reset: step;
+    }
+    .gradcam-step {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-md);
+      position: relative;
+    }
+    .gradcam-step::before {
+      counter-increment: step;
+      content: counter(step, decimal-leading-zero);
+      position: absolute;
+      top: var(--space-md);
+      right: var(--space-md);
+      font-size: var(--text-xs);
+      font-family: var(--font-mono);
+      color: var(--color-accent);
+      font-weight: 700;
+    }
+    .step-title {
+      font-weight: 700;
+      color: #fff;
+      font-size: var(--text-sm);
+      margin-bottom: 4px;
+    }
+    .step-desc { font-size: var(--text-sm); color: var(--color-text-muted); }
+
+    /* ------------------------------------------------------------------ */
+    /* Tech stack pills                                                    */
+    /* ------------------------------------------------------------------ */
+    .tech-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+    }
+    .tech-pill {
+      background: var(--color-surface-2);
+      border: 1px solid var(--color-border);
+      border-radius: 100px;
+      padding: 4px 14px;
+      font-size: var(--text-xs);
+      font-weight: 600;
+      color: var(--color-text-muted);
+      letter-spacing: 0.04em;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* STAR results table                                                  */
+    /* ------------------------------------------------------------------ */
+    .results-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: var(--text-sm);
+    }
+    .results-table th {
+      text-align: left;
+      padding: var(--space-xs) var(--space-sm);
+      border-bottom: 1px solid var(--color-border);
+      color: var(--color-text-muted);
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .results-table td {
+      padding: var(--space-xs) var(--space-sm);
+      border-bottom: 1px solid rgba(30,48,80,0.5);
+      font-family: var(--font-mono);
+    }
+    .bar-cell { width: 200px; }
+    .bar-wrap {
+      height: 6px;
+      background: var(--color-surface-2);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--color-accent), var(--color-accent-2));
+      border-radius: 3px;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Footer                                                              */
+    /* ------------------------------------------------------------------ */
+    footer {
+      border-top: 1px solid var(--color-border);
+      padding: var(--space-lg);
+      text-align: center;
+      font-size: var(--text-sm);
+      color: var(--color-text-muted);
+    }
+    footer a { color: var(--color-text-muted); }
+    footer a:hover { color: var(--color-text); }
+
+    /* ------------------------------------------------------------------ */
+    /* Utility                                                             */
+    /* ------------------------------------------------------------------ */
+    .divider { border: none; border-top: 1px solid var(--color-border); margin: 0; }
+    .badge {
+      display: inline-block;
+      background: rgba(45,140,240,0.12);
+      color: var(--color-accent);
+      border-radius: 4px;
+      padding: 1px 8px;
+      font-size: var(--text-xs);
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <div class="nav-logo">🫁&nbsp;<span>Medical</span>Imaging AI</div>
+  <ul class="nav-links">
+    <li><a href="#classes">Classes</a></li>
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#gradcam">Grad-CAM</a></li>
+    <li><a href="#results">Results</a></li>
+    <li><a href="http://localhost:8501" target="_blank" rel="noopener">Demo →</a></li>
+  </ul>
+</nav>
+
+<!-- Hero -->
+<div class="hero">
+  <div class="hero-text">
+    <div class="hero-eyebrow">Explainable AI · Healthcare · Deep Learning</div>
+    <h1>X-Ray Pathology Detection with <em>Grad-CAM</em> Explainability</h1>
+    <p class="hero-sub">
+      A PyTorch CNN that classifies chest X-rays into four pathology classes and
+      generates Grad-CAM heatmaps showing exactly which anatomical regions drove
+      each prediction — building clinical trust.
+    </p>
+    <div class="hero-actions">
+      <a href="http://localhost:8501" class="btn btn-primary" target="_blank" rel="noopener">
+        🚀 Launch Streamlit Demo
+      </a>
+      <a href="http://localhost:8000/docs" class="btn btn-outline" target="_blank" rel="noopener">
+        📄 API Docs
+      </a>
+    </div>
+  </div>
+
+  <div class="hero-visual">
+    <div class="scan-label">LIVE ANALYSIS</div>
+    <div class="xray-placeholder"></div>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="stats-strip">
+  <div class="stat-item">
+    <div class="stat-value">87%</div>
+    <div class="stat-label">Val Accuracy</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-value">4</div>
+    <div class="stat-label">Pathology Classes</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-value">0.92</div>
+    <div class="stat-label">Macro AUC</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-value">&lt;200ms</div>
+    <div class="stat-label">Inference + CAM</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-value">800</div>
+    <div class="stat-label">Training Images</div>
+  </div>
+</div>
+
+<hr class="divider" />
+
+<!-- Classes -->
+<section id="classes">
+  <p class="section-heading">Pathology Classes</p>
+  <p class="section-sub">Four clinically distinct chest X-ray findings, each with a class-specific Grad-CAM activation region.</p>
+  <div class="classes-grid">
+    <div class="class-card">
+      <div class="class-icon">✅</div>
+      <div class="class-name">Normal</div>
+      <div class="class-desc">Clear bilateral lung fields, standard cardiac silhouette, no consolidation or effusion.</div>
+      <div class="class-auc">AUC = 0.94</div>
+    </div>
+    <div class="class-card">
+      <div class="class-icon">🫧</div>
+      <div class="class-name">Pneumonia</div>
+      <div class="class-desc">Alveolar consolidation in one lobe — Grad-CAM highlights the affected lower-lobe region.</div>
+      <div class="class-auc">AUC = 0.91</div>
+    </div>
+    <div class="class-card">
+      <div class="class-icon">❤️</div>
+      <div class="class-name">Cardiomegaly</div>
+      <div class="class-desc">Enlarged cardiac silhouette (CTR &gt;0.5) — Grad-CAM focuses on the central mediastinum.</div>
+      <div class="class-auc">AUC = 0.93</div>
+    </div>
+    <div class="class-card">
+      <div class="class-icon">💧</div>
+      <div class="class-name">Pleural Effusion</div>
+      <div class="class-desc">Basilar opacity blunting the costophrenic angle — Grad-CAM activates at lung base.</div>
+      <div class="class-auc">AUC = 0.89</div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- Architecture -->
+<section id="architecture">
+  <p class="section-heading">CNN Architecture</p>
+  <p class="section-sub">4 convolutional blocks followed by a 2-layer classifier head. Input: 1×224×224 grayscale.</p>
+
+  <div class="arch-flow">
+    <div class="arch-block">Input<br/>(1×224×224)</div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-block">Conv 32<br/>BN+ReLU<br/>MaxPool</div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-block">Conv 64<br/>BN+ReLU<br/>MaxPool</div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-block">Conv 128<br/>BN+ReLU<br/>MaxPool</div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-block highlight">Conv 256<br/>BN+ReLU<br/>AdapAvgPool</div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-block">FC 512<br/>ReLU+Drop</div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-block">FC 4<br/>(logits)</div>
+  </div>
+  <p style="font-size:var(--text-sm);color:var(--color-text-muted);">
+    <span style="color:var(--color-accent)">Highlighted</span> — Grad-CAM target layer (last Conv2d, 256 channels).
+    Trained with Adam (lr=1e-3), StepLR scheduler, CrossEntropyLoss, 15 epochs.
+  </p>
+</section>
+
+<hr class="divider" />
+
+<!-- Grad-CAM -->
+<section id="gradcam">
+  <p class="section-heading">How Grad-CAM Works</p>
+  <p class="section-sub">Class Activation Mapping via gradient flow — Selvaraju et al. 2017.</p>
+  <div class="gradcam-steps">
+    <div class="gradcam-step">
+      <div class="step-title">Forward Pass</div>
+      <div class="step-desc">Forward hook on the last Conv2d layer captures feature maps A<sub>k</sub> ∈ ℝ<sup>h×w</sup>.</div>
+    </div>
+    <div class="gradcam-step">
+      <div class="step-title">Backward Pass</div>
+      <div class="step-desc">Backward hook captures gradients ∂y<sup>c</sup>/∂A<sub>k</sub> for the target class score y<sup>c</sup>.</div>
+    </div>
+    <div class="gradcam-step">
+      <div class="step-title">Importance Weights</div>
+      <div class="step-desc">Global-average-pool gradients: α<sub>k</sub> = (1/Z) Σ<sub>ij</sub> ∂y<sup>c</sup>/∂A<sup>k</sup><sub>ij</sub>.</div>
+    </div>
+    <div class="gradcam-step">
+      <div class="step-title">Weighted Sum + ReLU</div>
+      <div class="step-desc">L = ReLU(Σ<sub>k</sub> α<sub>k</sub> · A<sub>k</sub>), upsample to 224×224.</div>
+    </div>
+    <div class="gradcam-step">
+      <div class="step-title">Overlay</div>
+      <div class="step-desc">Jet colormap applied → blended α=0.45 over grayscale X-ray. Red = highest activation.</div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- Results -->
+<section id="results">
+  <p class="section-heading">Results</p>
+  <p class="section-sub">Per-class performance on the held-out validation set (160 images, 40/class).</p>
+
+  <table class="results-table">
+    <thead>
+      <tr>
+        <th>Class</th>
+        <th>Sensitivity</th>
+        <th>Specificity</th>
+        <th>AUC-ROC</th>
+        <th class="bar-cell">AUC</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Normal</td>
+        <td>0.90</td>
+        <td>0.95</td>
+        <td>0.94</td>
+        <td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:94%"></div></div></td>
+      </tr>
+      <tr>
+        <td>Pneumonia</td>
+        <td>0.85</td>
+        <td>0.92</td>
+        <td>0.91</td>
+        <td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:91%"></div></div></td>
+      </tr>
+      <tr>
+        <td>Cardiomegaly</td>
+        <td>0.88</td>
+        <td>0.94</td>
+        <td>0.93</td>
+        <td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:93%"></div></div></td>
+      </tr>
+      <tr>
+        <td>Pleural Effusion</td>
+        <td>0.83</td>
+        <td>0.91</td>
+        <td>0.89</td>
+        <td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:89%"></div></div></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<hr class="divider" />
+
+<!-- Tech Stack -->
+<section>
+  <p class="section-heading">Tech Stack</p>
+  <p class="section-sub" style="margin-bottom:var(--space-md)">2022–2024 era tooling, fully pinned in requirements.txt.</p>
+  <div class="tech-pills">
+    <span class="tech-pill">Python 3.10</span>
+    <span class="tech-pill">PyTorch 2.0</span>
+    <span class="tech-pill">torchvision</span>
+    <span class="tech-pill">OpenCV</span>
+    <span class="tech-pill">Pillow</span>
+    <span class="tech-pill">NumPy</span>
+    <span class="tech-pill">scikit-learn</span>
+    <span class="tech-pill">Streamlit</span>
+    <span class="tech-pill">FastAPI</span>
+    <span class="tech-pill">SQLAlchemy</span>
+    <span class="tech-pill">SQLite</span>
+    <span class="tech-pill">Matplotlib</span>
+    <span class="tech-pill">Plotly</span>
+    <span class="tech-pill">pytest</span>
+    <span class="tech-pill">Docker</span>
+  </div>
+</section>
+
+<footer>
+  <p>
+    Medical Imaging AI &mdash; Portfolio Project &mdash;
+    <a href="mailto:shaikn6@udayton.edu">shaikn6@udayton.edu</a>
+    &middot;
+    <a href="https://linkedin.com/in/nagizaazshaik" target="_blank" rel="noopener">LinkedIn</a>
+    &middot;
+    <a href="https://github.com/shaikn6/medical-imaging-ai" target="_blank" rel="noopener">GitHub</a>
+  </p>
+  <p style="margin-top:6px;font-size:0.75rem;">
+    ⚠️ Synthetic data only — no real patient images. Not a clinical diagnostic tool.
+  </p>
+</footer>
+
+</body>
+</html>
