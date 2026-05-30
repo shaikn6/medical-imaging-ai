@@ -32,3 +32,6 @@ pytest-cov==4.1.0
 
 # Pydantic (FastAPI dependency)
 pydantic==2.3.0
+
+# V2 additions
+pydicom>=2.4.0

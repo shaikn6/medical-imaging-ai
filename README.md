@@ -45,7 +45,9 @@ Build an explainable chest X-ray pathology classifier that not only detects **No
 
 ## Tech Stack
 
-Python 3.10 | PyTorch 2.0 | Grad-CAM | OpenCV | Streamlit | FastAPI | SQLAlchemy | NumPy | Matplotlib | Plotly
+![Stack](https://img.shields.io/badge/Stack-PyTorch%20%7C%20EfficientNet--B4%20%7C%20ScoreCAM%20%7C%20pydicom%20%7C%20Streamlit%20%7C%20FastAPI-blue)
+
+Python 3.10 | PyTorch 2.0 | Grad-CAM | ScoreCAM | EfficientNet-B4 | pydicom | OpenCV | Streamlit | FastAPI | SQLAlchemy | NumPy | Matplotlib | Plotly
 
 ---
 
@@ -146,6 +148,14 @@ docker-compose up --build
 # API:       http://localhost:8000
 # Dashboard: http://localhost:8501
 ```
+
+---
+
+## What's New in V2
+
+- **DICOM Input Pipeline** (`src/dicom_pipeline.py`): Parse `.dcm` files directly with `pydicom`; automatic window/level normalization from DICOM tags with sensible fallbacks (WW=1500, WL=-600 for chest imaging); outputs a `(1, 224, 224)` float32 tensor matching the model's expected format.
+- **ScoreCAM Explainability** (`src/scorecam.py`): Gradient-free saliency maps via forward-pass-only channel masking; produces sharper, more faithful heatmaps than Grad-CAM with no backward pass required; includes overlay blending and PNG export utilities.
+- **EfficientNet-B4 Backbone** (`src/efficientnet_model.py`): Second model option using `torchvision.models.efficientnet_b4` adapted for grayscale input; same 4-class classifier head as `XRayCNN`; includes `compare_models()` utility for side-by-side per-class AUC evaluation between any two models.
 
 ---
 
