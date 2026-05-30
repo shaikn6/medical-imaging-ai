@@ -165,7 +165,15 @@ with st.sidebar:
     else:
         uploaded = st.file_uploader("Upload X-ray (PNG/JPEG)", type=["png", "jpg", "jpeg"])
         if uploaded:
-            shared_pil = Image.open(uploaded).convert("L")
+            _MAX_UPLOAD_MB = 10
+            if uploaded.size > _MAX_UPLOAD_MB * 1024 * 1024:
+                st.error(f"File too large. Maximum allowed size is {_MAX_UPLOAD_MB} MB.")
+                st.stop()
+            try:
+                shared_pil = Image.open(uploaded).convert("L")
+            except Exception:
+                st.error("Could not decode the uploaded image. Please upload a valid PNG or JPEG.")
+                st.stop()
         else:
             shared_pil = None
 
@@ -229,14 +237,19 @@ with tab1:
         st.plotly_chart(make_label_bar_chart(prob_dict), use_container_width=True)
 
         st.subheader("Detected Pathologies (p ≥ 0.5)")
+        import html as _html
         chips = ""
         found_any = False
         for cls, p in prob_dict.items():
             if p >= 0.5:
+                # cls comes from a fixed MULTILABEL_CLASSES list (not user input),
+                # but escape defensively in case the list ever includes external data.
                 color = LABEL_COLORS.get(cls, "#8b949e")
+                safe_cls = _html.escape(str(cls))
+                safe_pct = _html.escape(f"{p:.0%}")
                 chips += (
                     f"<span class='label-chip' style='background:{color}20;"
-                    f"color:{color};border:1px solid {color}'>{cls} {p:.0%}</span> "
+                    f"color:{color};border:1px solid {color}'>{safe_cls} {safe_pct}</span> "
                 )
                 found_any = True
         if not found_any:
@@ -377,9 +390,11 @@ with tab4:
 
     with col_ctrl:
         st.markdown("### Metadata")
+        # PHI fields (PatientName, PatientID) are intentionally excluded from
+        # display even for synthetic data — the pattern must be safe for real DICOMs.
+        # If you need to show patient identity for clinical review, use a fully
+        # de-identified display layer with role-based access control.
         meta_items = {
-            "PatientID":     ds.PatientID,
-            "PatientName":   ds.PatientName,
             "StudyDate":     ds.StudyDate,
             "Modality":      ds.Modality,
             "SOPInstanceUID": ds.SOPInstanceUID[:30] + "…",
@@ -393,8 +408,11 @@ with tab4:
             meta_items["RescaleIntercept"] = ds.RescaleIntercept
             meta_items["RescaleSlope"]     = ds.RescaleSlope
 
+        import html as _html
         for k, v in meta_items.items():
-            st.write(f"**{k}**: `{v}`")
+            safe_k = _html.escape(str(k))
+            safe_v = _html.escape(str(v))
+            st.write(f"**{safe_k}**: `{safe_v}`")
 
     with col_view:
         st.subheader("Pixel Arrays")

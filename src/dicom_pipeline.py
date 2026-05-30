@@ -11,10 +11,19 @@ Usage::
 
     dcm = load_dicom_image("scan.dcm")
     tensor = dicom_to_tensor(dcm)   # shape (1, 224, 224)
+
+Security notes
+--------------
+- ``load_dicom_image`` validates the file extension, enforces a size cap
+  (default 200 MB), and does NOT pass ``force=True`` to pydicom so that
+  non-DICOM files are rejected at the parser level.
+- Call ``scrub_phi`` on any dataset before logging, storing, or displaying
+  metadata to prevent accidental PHI exposure (HIPAA).
 """
 
 from __future__ import annotations
 
+import os
 import warnings
 from typing import Optional, Tuple
 
@@ -33,6 +42,45 @@ from pydicom.uid import ExplicitVRLittleEndian
 DEFAULT_WINDOW_WIDTH: float = 1500.0
 DEFAULT_WINDOW_LEVEL: float = -600.0
 
+# ---------------------------------------------------------------------------
+# Security constants
+# ---------------------------------------------------------------------------
+# Maximum DICOM file size: 200 MB (single-slice CT is typically < 10 MB;
+# 200 MB accommodates multi-frame studies while blocking huge malicious uploads)
+_MAX_DICOM_BYTES: int = int(os.environ.get("MAX_DICOM_BYTES", 200 * 1024 * 1024))
+
+# Allowed file extensions for DICOM inputs
+_ALLOWED_DICOM_EXTENSIONS: frozenset[str] = frozenset({".dcm", ".dicom", ".ima", ".img"})
+
+# DICOM tags that contain Protected Health Information (PHI).
+# These must be scrubbed before any metadata is logged, stored, or displayed.
+# Ref: DICOM PS3.15 Annex E (De-identification profiles).
+_PHI_TAGS: tuple[str, ...] = (
+    "PatientName",
+    "PatientID",
+    "PatientBirthDate",
+    "PatientSex",
+    "PatientAge",
+    "PatientAddress",
+    "PatientTelephoneNumbers",
+    "PatientMotherBirthName",
+    "OtherPatientIDs",
+    "OtherPatientNames",
+    "PatientInsurancePlanCodeSequence",
+    "PatientReligiousPreference",
+    "ResponsiblePerson",
+    "ReferringPhysicianName",
+    "InstitutionName",
+    "InstitutionAddress",
+    "StationName",
+    "StudyDescription",
+    "RequestingPhysician",
+    "PerformingPhysicianName",
+    "NameOfPhysiciansReadingStudy",
+    "OperatorsName",
+    "AccessionNumber",
+)
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -40,7 +88,11 @@ DEFAULT_WINDOW_LEVEL: float = -600.0
 
 def load_dicom_image(path: str) -> FileDataset:
     """
-    Load a DICOM file from disk.
+    Load a DICOM file from disk with security validation.
+
+    Checks performed before parsing:
+      1. File extension must be in the DICOM allow-list.
+      2. File size must not exceed ``_MAX_DICOM_BYTES``.
 
     Parameters
     ----------
@@ -56,10 +108,61 @@ def load_dicom_image(path: str) -> FileDataset:
     ------
     FileNotFoundError
         If the file does not exist.
+    ValueError
+        If the extension or file size is not allowed.
     pydicom.errors.InvalidDicomError
-        If the file is not valid DICOM.
+        If the file is not valid DICOM (force=False ensures strict validation).
     """
-    dcm = pydicom.dcmread(path, force=True)
+    # 1. Extension check (pydicom will also validate magic bytes, but this
+    #    provides a fast, early rejection of obviously wrong file types)
+    ext = os.path.splitext(path)[1].lower()
+    if ext not in _ALLOWED_DICOM_EXTENSIONS:
+        raise ValueError(
+            f"File extension '{ext}' is not an allowed DICOM extension. "
+            f"Allowed: {sorted(_ALLOWED_DICOM_EXTENSIONS)}"
+        )
+
+    # 2. Size cap before parsing (prevents DoS via malformed giant files)
+    try:
+        file_size = os.path.getsize(path)
+    except OSError as exc:
+        raise FileNotFoundError(f"Cannot stat file: {path}") from exc
+
+    if file_size > _MAX_DICOM_BYTES:
+        raise ValueError(
+            f"DICOM file exceeds maximum allowed size "
+            f"({file_size} bytes > {_MAX_DICOM_BYTES} bytes)."
+        )
+
+    # 3. Parse without force=True — rejects non-DICOM files at the header level
+    dcm = pydicom.dcmread(path)
+    return dcm
+
+
+def scrub_phi(dcm: Dataset) -> Dataset:
+    """
+    Remove Protected Health Information (PHI) tags from a DICOM dataset in-place.
+
+    This performs a *basic* de-identification suitable for logging and display.
+    It does NOT constitute a full HIPAA de-identification — for clinical use
+    apply a full de-identification profile (DICOM PS3.15 Annex E).
+
+    Parameters
+    ----------
+    dcm : pydicom.Dataset
+        Dataset to scrub (modified in-place).
+
+    Returns
+    -------
+    pydicom.Dataset
+        The same dataset with PHI tags removed.
+    """
+    for tag_name in _PHI_TAGS:
+        if hasattr(dcm, tag_name):
+            try:
+                delattr(dcm, tag_name)
+            except AttributeError:
+                pass
     return dcm
 
 

@@ -16,17 +16,20 @@ from __future__ import annotations
 import base64
 import io
 import json
+import logging
 import os
 import sys
 import time
 
 import numpy as np
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from PIL import Image
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(_HERE)
@@ -45,15 +48,40 @@ from model.cnn_classifier import CLASSES      # noqa: E402
 app = FastAPI(
     title="Medical Imaging AI",
     description="Chest X-ray pathology detection with Grad-CAM explainability",
-    version="1.0.0",
+    version="1.1.0",
 )
+
+# ---------------------------------------------------------------------------
+# Security: restrict CORS to specific origins rather than wildcard "*".
+# Override via ALLOWED_ORIGINS env var (comma-separated list).
+# ---------------------------------------------------------------------------
+_raw_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:8501")
+_allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_allowed_origins,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Accept"],
 )
+
+# ---------------------------------------------------------------------------
+# Security: upload limits
+# ---------------------------------------------------------------------------
+# Maximum upload size: 10 MB for standard images; real DICOM can be larger
+# but 10 MB is a safe ceiling for single-slice X-ray images.
+MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", 10 * 1024 * 1024))
+
+# Allowed MIME types (content_type check only — PIL validates actual bytes)
+_ALLOWED_CONTENT_TYPES = frozenset({
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "image/gif",   # Pillow can decode; GIF falls back gracefully
+    "image/webp",
+    "image/bmp",
+    "image/tiff",
+})
 
 CHECKPOINT = os.environ.get(
     "MODEL_CHECKPOINT",
@@ -67,10 +95,12 @@ def get_pipeline() -> InferencePipeline:
     global _pipeline
     if _pipeline is None:
         if not os.path.exists(CHECKPOINT):
+            # Do NOT expose the filesystem path in the response body.
+            logger.error("Model checkpoint not found: %s", CHECKPOINT)
             raise HTTPException(
                 status_code=503,
-                detail=f"Model checkpoint not found at {CHECKPOINT}. "
-                       "Run model/trainer.py first.",
+                detail="Model checkpoint unavailable. "
+                       "Contact the administrator or run the training script.",
             )
         _pipeline = InferencePipeline(CHECKPOINT)
     return _pipeline
@@ -132,16 +162,39 @@ async def predict(
     - Per-class probability breakdown
     - Grad-CAM heatmap overlay (base64 PNG)
     """
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="File must be an image.")
+    # --- Content-type validation (defense-in-depth; PIL validates actual bytes) ---
+    content_type = (file.content_type or "").lower().split(";")[0].strip()
+    if content_type not in _ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported file type. Upload a PNG or JPEG image.",
+        )
 
     t0 = time.perf_counter()
 
-    raw = await file.read()
+    # --- File-size limit: read in chunks to avoid buffering a huge malicious upload ---
+    raw_chunks: list[bytes] = []
+    bytes_read = 0
+    chunk_size = 65536  # 64 KiB
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        bytes_read += len(chunk)
+        if bytes_read > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Upload exceeds maximum allowed size ({MAX_UPLOAD_BYTES // (1024*1024)} MB).",
+            )
+        raw_chunks.append(chunk)
+    raw = b"".join(raw_chunks)
+
+    # --- Decode image bytes (PIL validates magic bytes, not just MIME) ---
     try:
         pil_image = Image.open(io.BytesIO(raw)).convert("L")
-    except Exception as exc:
-        raise HTTPException(status_code=422, detail=f"Cannot decode image: {exc}") from exc
+    except Exception:
+        # Do NOT echo exception details back — they can expose PIL internals / paths
+        raise HTTPException(status_code=422, detail="Cannot decode image file.") from None
 
     pipeline = get_pipeline()
     result = pipeline.run(pil_image)
@@ -153,9 +206,13 @@ async def predict(
 
     processing_ms = (time.perf_counter() - t0) * 1000.0
 
-    # Persist to DB
+    # --- Sanitise the filename: keep only the basename to prevent path traversal ---
+    raw_filename = file.filename or ""
+    safe_filename = os.path.basename(raw_filename)[:256] or None
+
+    # Persist to DB (safe_filename only — never the raw user-supplied path)
     record = PredictionRecord(
-        filename=file.filename,
+        filename=safe_filename,
         predicted_class=result.predicted_class,
         confidence=result.confidence,
         probabilities_json=json.dumps(result.probabilities),
@@ -166,7 +223,7 @@ async def predict(
     db.refresh(record)
 
     return PredictionResponse(
-        filename=file.filename,
+        filename=safe_filename,
         predicted_class=result.predicted_class,
         predicted_idx=result.predicted_idx,
         confidence=result.confidence,
@@ -178,10 +235,12 @@ async def predict(
 
 @app.get("/predictions", response_model=list[PredictionSummary])
 def list_predictions(limit: int = 20, db: Session = Depends(get_db)):
+    # Cap the limit to prevent excessively large result sets
+    capped_limit = max(1, min(limit, 200))
     rows = (
         db.query(PredictionRecord)
         .order_by(PredictionRecord.created_at.desc())
-        .limit(limit)
+        .limit(capped_limit)
         .all()
     )
     return [

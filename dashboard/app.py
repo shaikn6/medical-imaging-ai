@@ -184,7 +184,16 @@ if input_mode == "Upload image":
         type=["png", "jpg", "jpeg"],
     )
     if uploaded is not None:
-        pil_input = Image.open(uploaded).convert("L")
+        # Enforce a 10 MB size cap before decoding to prevent malicious files
+        _MAX_UPLOAD_MB = 10
+        if uploaded.size > _MAX_UPLOAD_MB * 1024 * 1024:
+            st.error(f"File too large. Maximum allowed size is {_MAX_UPLOAD_MB} MB.")
+            st.stop()
+        try:
+            pil_input = Image.open(uploaded).convert("L")
+        except Exception:
+            st.error("Could not decode the uploaded image. Please upload a valid PNG or JPEG.")
+            st.stop()
 else:
     # Synthetic test image
     from data.synthetic_xray import GENERATORS
@@ -217,11 +226,15 @@ if pil_input is not None:
 
     with col_chart:
         st.subheader("Prediction")
+        # Escape class name and confidence before injecting into HTML
+        import html as _html
+        _safe_class = _html.escape(str(result.predicted_class))
+        _safe_conf  = _html.escape(f"{result.confidence:.1%}")
         st.markdown(
             f"<div class='metric-card'>"
             f"Predicted class:&nbsp;&nbsp;"
-            f"<span class='class-badge'>{result.predicted_class}</span><br/>"
-            f"Confidence:&nbsp;&nbsp;<strong>{result.confidence:.1%}</strong>"
+            f"<span class='class-badge'>{_safe_class}</span><br/>"
+            f"Confidence:&nbsp;&nbsp;<strong>{_safe_conf}</strong>"
             f"</div>",
             unsafe_allow_html=True,
         )

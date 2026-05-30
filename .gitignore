@@ -26,3 +26,22 @@ api/predictions.db
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Model weights — large binary files; regenerate via model/trainer.py
+# CRITICAL: never commit real model weights trained on PHI-containing datasets
+*.pth
+*.pt
+*.pkl
+*.ckpt
+*.bin
+
+# DICOM files — may contain Protected Health Information (PHI / HIPAA)
+# Never commit real patient DICOM files to version control
+*.dcm
+*.dicom
+*.ima
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
