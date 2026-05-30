@@ -1,9 +1,23 @@
-> **Private Repository** — Source code available on request for verified employers and collaborators.
-> Contact: shaikn6@udayton.edu | [LinkedIn](https://linkedin.com/in/nagizaazshaik)
 
 ---
 
 # Medical Imaging AI — Chest X-Ray Pathology Detection with Grad-CAM Explainability
+
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-22c55e)
+![Tests](https://img.shields.io/badge/Tests-passing-22c55e)
+![Stack](https://img.shields.io/badge/Stack-PyTorch-6366f1)
+
+
+## Quick Start
+
+```bash
+git clone https://github.com/shaikn6/medical-imaging-ai.git
+cd medical-imaging-ai
+pip install -r requirements.txt
+pytest tests/                    # run test suite
+streamlit run dashboard/app_v2.py    # launch dashboard
+```
 
 ## Situation
 
