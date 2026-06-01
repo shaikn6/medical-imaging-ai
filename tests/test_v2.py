@@ -22,13 +22,9 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
 
 from src.dicom_pipeline import (
-    DEFAULT_WINDOW_LEVEL,
-    DEFAULT_WINDOW_WIDTH,
     _apply_window_level,
     _extract_pixel_array,
-    _get_window_params,
     dicom_to_tensor,
-    load_dicom_image,
     make_synthetic_dicom,
 )
 from src.scorecam import (

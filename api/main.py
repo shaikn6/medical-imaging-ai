@@ -21,10 +21,8 @@ import os
 import sys
 import time
 
-import numpy as np
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from PIL import Image
 from pydantic import BaseModel
 from sqlalchemy.orm import Session

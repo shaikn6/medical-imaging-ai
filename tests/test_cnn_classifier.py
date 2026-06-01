@@ -5,7 +5,6 @@ Tests for model/cnn_classifier.py
 import os
 import sys
 
-import pytest
 import torch
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

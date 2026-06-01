@@ -34,7 +34,6 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import Sequence
 
 import numpy as np
 import torch
@@ -47,7 +46,7 @@ _ROOT = os.path.dirname(_HERE)
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from model.gradcam import GradCAM, overlay_heatmap, heatmap_to_rgb  # noqa: E402
+from model.gradcam import GradCAM, overlay_heatmap  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -226,7 +225,7 @@ class GradCAMSequence:
         """Generate a synthetic slice and return (tensor, uint8_array)."""
         from data.synthetic_xray import generate_pneumonia_xray, generate_normal_xray
 
-        rng = np.random.default_rng(self.seed + slice_idx)
+        np.random.default_rng(self.seed + slice_idx)
 
         # Alternate between normal and slightly lesion-shifted slices
         if slice_idx < self.n_slices // 2:

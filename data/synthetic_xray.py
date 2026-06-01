@@ -205,7 +205,6 @@ def generate_dataset(
 
 def get_dataset_class():
     """Return XRayDataset class (lazy import to avoid hard torch dependency)."""
-    import torch
     from torch.utils.data import Dataset
     from torchvision import transforms
 

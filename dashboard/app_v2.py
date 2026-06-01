@@ -13,10 +13,8 @@ Run:
 
 from __future__ import annotations
 
-import io
 import os
 import sys
-import tempfile
 
 import numpy as np
 import plotly.graph_objects as go

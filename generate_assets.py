@@ -147,7 +147,6 @@ def plot_training_curves():
 # ============================================================
 
 def plot_gradcam_examples():
-    import torch
     from PIL import Image
     from data.synthetic_xray import GENERATORS
     from data.augmentation import get_val_transforms
@@ -221,7 +220,7 @@ def plot_roc_curves():
     from sklearn.metrics import roc_curve
     from data.synthetic_xray import get_dataset_class
     from data.augmentation import get_val_transforms
-    from model.cnn_classifier import load_model, NUM_CLASSES
+    from model.cnn_classifier import load_model
 
     print("\n" + "=" * 60)
     print("STEP 5 — Generating roc_curves.png")

@@ -22,7 +22,6 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import numpy as np
 import torch
-import torch.nn.functional as F
 
 _ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _ROOT)
@@ -148,7 +147,6 @@ def generate_gradcam_scorecam_screenshot():
     from model.cnn_classifier import build_model
     from model.gradcam import GradCAM, overlay_heatmap
     from explainability.gradcam_video import ScoreCAM
-    from data.synthetic_xray import generate_pneumonia_xray
 
     print("  Generating Grad-CAM / ScoreCAM comparison screenshot …")
 

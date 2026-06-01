@@ -85,7 +85,7 @@ def generate_scorecam(
             logits = model(image_tensor)
         target_class = int(logits.argmax(dim=-1).item())
 
-    num_channels = feature_maps.shape[1]
+    feature_maps.shape[1]
     h_in, w_in = image_tensor.shape[2], image_tensor.shape[3]
 
     # Step 2: upsample each feature map to input size, normalise → mask
